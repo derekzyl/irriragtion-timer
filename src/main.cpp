@@ -15,7 +15,7 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 RTC_DS3231 rtc;
 
 // Variables for irrigation settings
-int sprayHour = 6;     // Spray interval (every 6 hours)
+int sprayMinutes = 360;     // Spray interval (every 6 hours)
 int sprayDuration = 30; // Spray duration (30 minutes)
 int startHour = 6;      // Start time for irrigation (6 AM)
 int startMinute = 0;    // Start time minute
@@ -103,50 +103,144 @@ void loop() {
   delay(100);
 }
 
+// void displayTimeAndSettings() {
+//   currentTime = rtc.now();
+//   lcd.clear();
+
 void displayTimeAndSettings() {
   currentTime = rtc.now();
   lcd.clear();
 
   // Display current time at the top
   lcd.setCursor(0, 0);
-  lcd.print("Time: ");
+  lcd.print("T:");
+  if (currentTime.hour() < 10) lcd.print("0");
   lcd.print(currentTime.hour());
   lcd.print(":");
+  if (currentTime.minute() < 10) lcd.print("0");
   lcd.print(currentTime.minute());
+  lcd.print(" ST:");
+     lcd.print(startHour);
+    lcd.print(":");
+    if (startMinute < 10) lcd.print("0");
+    lcd.print(startMinute);
 
-  // Display spray interval and duration at the bottom
+
+  // Display schedule info at the bottom
   lcd.setCursor(0, 1);
-  lcd.print("Spray: ");
-  lcd.print(sprayHour);
-  lcd.print("h/");
-  lcd.print(sprayDuration);
-  lcd.print("min");
+  
+    // Show hours and minutes for the spray interval
+    lcd.print(sprayMinutes / 60);
+    lcd.print("h");
+    if (sprayMinutes % 60 > 0) {
+      lcd.print(sprayMinutes % 60);
+      lcd.print("m");
+    }
+    lcd.print("-");
+    lcd.print(sprayDuration);
+    lcd.print("m");
+    lcd.print(" ET:");
+    lcd.print(endHour);
+    lcd.print(":");
+    if (endMinute < 10) lcd.print("0");
+    lcd.print(endMinute);
+ 
+ 
 }
 
 void checkIrrigation() {
-  // Check if the current time matches the scheduled irrigation time
-  if (currentTime.hour() % sprayHour == 0 && currentTime.minute() == 0) {
-    triggerIrrigation();
+  currentTime = rtc.now();
+  int currentHour = currentTime.hour();
+  int currentMinute = currentTime.minute();
+  
+  // Convert current time to minutes for easier comparison
+  int currentTimeInMinutes = currentHour * 60 + currentMinute;
+  int startTimeInMinutes = startHour * 60 + startMinute;
+  int endTimeInMinutes = endHour * 60 + endMinute;
+  
+  // Check if we're within the allowed time window
+  bool isWithinTimeWindow;
+  
+  // Handle case where end time is on the next day
+  if (endTimeInMinutes <= startTimeInMinutes) {
+    isWithinTimeWindow = (currentTimeInMinutes >= startTimeInMinutes) || 
+                        (currentTimeInMinutes <= endTimeInMinutes);
+  } else {
+    isWithinTimeWindow = (currentTimeInMinutes >= startTimeInMinutes) && 
+                        (currentTimeInMinutes <= endTimeInMinutes);
+  }
+  
+  // Check if we're at a spray interval
+  bool isSprayTime = false;
+  
+  // Calculate the number of minutes since the start time
+  int minutesSinceStart;
+  if (currentTimeInMinutes >= startTimeInMinutes) {
+    minutesSinceStart = currentTimeInMinutes - startTimeInMinutes;
+  } else {
+    minutesSinceStart = 24 * 60 + currentTimeInMinutes - startTimeInMinutes;
+  }
+  
+  // Check if we're at a spray interval
+  if (minutesSinceStart % sprayMinutes == 0) {
+    isSprayTime = true;
+  }
+  
+  // Only trigger irrigation if we're within the time window and it's spray time
+  if (isWithinTimeWindow && isSprayTime) {
+    // Check if the switch is enabled (active low)
+    // if (digitalRead(SWITCH_PIN) == LOW) {
+      triggerIrrigation();
+    // }
+  } else {
+    // Ensure irrigation is off outside the schedule
+    digitalWrite(IRRIGATION_PIN, LOW);
   }
 }
 
+
+
 void triggerIrrigation() {
+  // Only proceed if we're still within the time window when starting
+  currentTime = rtc.now();
+  int currentTimeInMinutes = currentTime.hour() * 60 + currentTime.minute();
+  int endTimeInMinutes = endHour * 60 + endMinute;
+  
+  // Calculate maximum duration to avoid running past end time
+  int maxDuration;
+  if (endTimeInMinutes <= currentTimeInMinutes) {
+    maxDuration = (24 * 60 - currentTimeInMinutes + endTimeInMinutes);
+  } else {
+    maxDuration = endTimeInMinutes - currentTimeInMinutes;
+  }
+  
+  // Use the shorter of sprayDuration or remaining time until end
+  int actualDuration = min(sprayDuration, maxDuration);
+  
   digitalWrite(ALARM_PIN, HIGH);
   digitalWrite(IRRIGATION_PIN, HIGH);
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Irrigation ON");
+  lcd.setCursor(0, 1);
+  lcd.print("For: ");
+  lcd.print(actualDuration);
+  lcd.print("min");
+  
   Serial.println("Irrigation ON");
   delay(1000);  // Delay to ensure the relay is triggered
   digitalWrite(ALARM_PIN, LOW);
-  delay(sprayDuration * 60 * 1000);  // sprayDuration in minutes
-
+  
+  // Run for the calculated duration
+  delay(actualDuration * 60UL * 1000UL);  // Convert minutes to milliseconds
+  
   digitalWrite(IRRIGATION_PIN, LOW);
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Irrigation OFF");
   Serial.println("Irrigation OFF");
 }
+
 
 void enterMenu() {
   currentMenu = MAIN;
@@ -192,27 +286,41 @@ void handleMenu() {
 void setTime() {
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Set Time:");
+  lcd.print("Time set mode");
+  
   
   // Implement logic for setting the RTC time
 }
+
 
 void setSprayInterval() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Set Interval:");
-
+  
   while (true) {
     lcd.setCursor(0, 1);
-    lcd.print(sprayHour);
-    lcd.print(" hours");
+    // Display hours and minutes
+    lcd.print(sprayMinutes / 60);
+    lcd.print("h ");
+    lcd.print(sprayMinutes % 60);
+    lcd.print("m    ");
 
     if (digitalRead(SWITCH_PIN) == LOW) {
-      sprayHour++;
+      // Increment by 30 minutes
+      sprayMinutes += 30;
+      if (sprayMinutes > 1440) { // Max 24 hours (1440 minutes)
+        sprayMinutes = 30;
+      }
       delay(200);  // Debounce
     }
+    
     if (digitalRead(SELECT_PIN) == LOW) {
-      sprayHour = max(1, sprayHour - 1);  // Don't allow less than 1 hour
+      // Decrement by 30 minutes
+      sprayMinutes -= 30;
+      if (sprayMinutes < 30) { // Minimum 30 minutes
+        sprayMinutes = 1440;
+      }
       delay(200);
     }
 
@@ -221,6 +329,7 @@ void setSprayInterval() {
     }
   }
 }
+
 
 void setSprayDuration() {
   lcd.clear();
@@ -257,6 +366,9 @@ void setStartTime() {
     lcd.setCursor(0, 1);
     lcd.print(startHour);
     lcd.print(":");
+    if(startMinute<10){
+      lcd.print("0");
+    }
     lcd.print(startMinute);
 
 switch (selectedStartTimeIndex)
@@ -266,6 +378,9 @@ case 0:{
   lcd.setCursor(0, 1);
   lcd.print(startHour);
   lcd.print(":");
+  if(startMinute<10){
+    lcd.print("0");
+  }
   lcd.print(startMinute);
   if (digitalRead(SWITCH_PIN) == LOW) {
     
@@ -284,6 +399,9 @@ case 1:{
   lcd.setCursor(0, 1);
   lcd.print(startHour);
   lcd.print(":");
+  if(startMinute<10){
+    lcd.print("0");
+  }
   lcd.print(startMinute);
   if (digitalRead(SWITCH_PIN) == LOW) {
     setHourOrMinute(MINUTE, START, INCREASE);
@@ -329,6 +447,9 @@ void setEndTime() {
     lcd.setCursor(0, 1);
     lcd.print(endHour);
     lcd.print(":");
+    if(endMinute<10){
+      lcd.print("0");
+    }
     lcd.print(endMinute);
 
     switch (selectedEndTimeIndex)
@@ -338,6 +459,9 @@ void setEndTime() {
         lcd.setCursor(0, 1);
         lcd.print(endHour);
         lcd.print(":");
+        if(endMinute<10){
+          lcd.print("0");
+        }
         lcd.print(endMinute);
         if (digitalRead(SWITCH_PIN) == LOW) {
 
@@ -420,6 +544,13 @@ void setHourOrMinute(HourOrMinute setting, TimeSetting timeSetting, IncreaseOrDe
 
 
 
+
+
+
+
+
+
+
  {
   if (setting == HOUR) {
     if (action == INCREASE) {
@@ -484,3 +615,83 @@ void setHourOrMinute(HourOrMinute setting, TimeSetting timeSetting, IncreaseOrDe
   }
 }
 }
+
+
+
+
+
+
+
+
+
+
+
+// void setSprayInterval() {
+//   lcd.clear();
+//   lcd.setCursor(0, 0);
+//   lcd.print("Set Interval:");
+
+//   while (true) {
+//     lcd.setCursor(0, 1);
+//     lcd.print(sprayMinutes);
+//     lcd.print("minutes");
+
+//     if (digitalRead(SWITCH_PIN) == LOW) {
+//       sprayMinutes++;
+//       delay(200);  // Debounce
+//     }
+//     if (digitalRead(SELECT_PIN) == LOW) {
+//       sprayMinutes = max(1, sprayMinutes - 1);  // Don't allow less than 1 hour
+//       delay(200);
+//     }
+
+//     if (detectLongPress(MENU_PIN)) {
+//       return;  // Exit back to menu on long press
+//     }
+//   }
+// }
+
+
+
+
+//   // Display current time at the top
+//   lcd.setCursor(0, 0);
+//   lcd.print("Time: ");
+//   lcd.print(currentTime.hour());
+//   lcd.print(":");
+//   lcd.print(currentTime.minute());
+
+//   // Display spray interval and duration at the bottom
+//   lcd.setCursor(0, 1);
+//   lcd.print("Spray: ");
+//   lcd.print(sprayMinutes);
+//   lcd.print("h/");
+//   lcd.print(sprayDuration);
+//   lcd.print("min");
+// }
+
+// void checkIrrigation() {
+//   // Check if the current time matches the scheduled irrigation time
+//   if (currentTime.hour() % sprayMinutes == 0 && currentTime.minute() == 0) {
+//     triggerIrrigation();
+//   }
+// }
+
+
+// void triggerIrrigation() {
+//   digitalWrite(ALARM_PIN, HIGH);
+//   digitalWrite(IRRIGATION_PIN, HIGH);
+//   lcd.clear();
+//   lcd.setCursor(0, 0);
+//   lcd.print("Irrigation ON");
+//   Serial.println("Irrigation ON");
+//   delay(1000);  // Delay to ensure the relay is triggered
+//   digitalWrite(ALARM_PIN, LOW);
+//   delay(sprayDuration * 60 * 1000);  // sprayDuration in minutes
+
+//   digitalWrite(IRRIGATION_PIN, LOW);
+//   lcd.clear();
+//   lcd.setCursor(0, 0);
+//   lcd.print("Irrigation OFF");
+//   Serial.println("Irrigation OFF");
+// }
