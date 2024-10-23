@@ -1,14 +1,14 @@
-
- #include <SPI.h>
+#include <SPI.h>
 #include <Wire.h>
 #include <RTClib.h>
 #include <LiquidCrystal_I2C.h>
 
 // Define pins
 int ALARM_PIN = 13;
-int BUTTON_PIN_ONE = 8;  // Button for menu navigation and selection
-int BUTTON_PIN_TWO = 6;  // Button for decreasing values
+int MENU_PIN = 8;  // Button for menu navigation and selection
+int SELECT_PIN = 6;  // Button for decreasing values
 int IRRIGATION_PIN = 12;
+int SWITCH_PIN=5;
 
 // Define LCD and RTC objects
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -17,17 +17,28 @@ RTC_DS3231 rtc;
 // Variables for irrigation settings
 int sprayHour = 6;     // Spray interval (every 6 hours)
 int sprayDuration = 30; // Spray duration (30 minutes)
+int startHour = 6;      // Start time for irrigation (6 AM)
+int startMinute = 0;    // Start time minute
+int endHour = 18;       // End time for irrigation (6 PM)
+int endMinute = 0;      // End time minute
+
 DateTime currentTime;
 
-enum MenuState { MAIN, SET_TIME, SET_INTERVAL, SET_DURATION, EXIT_MENU };
+enum MenuState { MAIN, SET_TIME, SET_INTERVAL, SET_DURATION, SET_START_TIME, SET_END_TIME, EXIT_MENU };
 MenuState currentMenu = MAIN;
 
+enum  HourOrMinute { HOUR, MINUTE };
+HourOrMinute currentSetting = HOUR;
 unsigned long buttonOnePressTime = 0;
 bool buttonOneLongPressDetected = false;
-const unsigned long longPressDuration = 2000; // 2 seconds for long press detection
+const unsigned long longPressDuration = 3000; // 2 seconds for long press detection
 
 int selectedMenuIndex = 0;
-const int maxMenuItems = 4;
+int selectedStartTimeIndex = 0;
+int selectedEndTimeIndex = 0;
+
+const int maxMenuItems = 6;  // Updated number of menu items
+const int maxTimeItems = 2;  // Updated number of time items
 
 // Prototypes
 void displayTimeAndSettings();
@@ -39,6 +50,8 @@ bool detectLongPress(int buttonPin);
 void setSprayInterval();
 void setSprayDuration();
 void setTime();
+void setStartTime();
+void setEndTime();
 
 void setup() {
   Serial.begin(9600);
@@ -60,16 +73,17 @@ void setup() {
   // Initialize pins
   pinMode(ALARM_PIN, OUTPUT);
   pinMode(IRRIGATION_PIN, OUTPUT);
-  pinMode(BUTTON_PIN_ONE, INPUT_PULLUP);
-  pinMode(BUTTON_PIN_TWO, INPUT_PULLUP);
+  pinMode(MENU_PIN, INPUT_PULLUP);
+  pinMode(SELECT_PIN, INPUT_PULLUP);
+  pinMode(SWITCH_PIN, INPUT_PULLUP);
 
   // Display default info on LCD
-displayTimeAndSettings();
+  displayTimeAndSettings();
 }
 
 void loop() {
   // Detect long press to enter menu mode
-  if (detectLongPress(BUTTON_PIN_ONE)) {
+  if (detectLongPress(MENU_PIN)) {
     enterMenu();
   }
 
@@ -137,21 +151,25 @@ void handleMenu() {
       case 0: lcd.print("> Set Time"); break;
       case 1: lcd.print("> Set Interval"); break;
       case 2: lcd.print("> Set Duration"); break;
-      case 3: lcd.print("> Exit"); break;
+      case 3: lcd.print("> Set Start Time"); break;  // Added start time menu option
+      case 4: lcd.print("> Set End Time"); break;    // Added end time menu option
+      case 5: lcd.print("> Exit"); break;
     }
 
-    if (detectLongPress(BUTTON_PIN_ONE)) {
+    if (detectLongPress(SELECT_PIN)) {
       // Long press selects the current menu item
       switch (selectedMenuIndex) {
         case 0: setTime(); break;
         case 1: setSprayInterval(); break;
         case 2: setSprayDuration(); break;
-        case 3: currentMenu = MAIN; return;
+        case 3: setStartTime(); break;  // Added start time logic
+        case 4: setEndTime(); break;    // Added end time logic
+        case 5: currentMenu = MAIN; return;
       }
     }
 
     // Short press navigates between menu items
-    if (digitalRead(BUTTON_PIN_ONE) == LOW) {
+    if (digitalRead(MENU_PIN) == LOW) {
       selectedMenuIndex = (selectedMenuIndex + 1) % maxMenuItems;
       delay(200);  // Debounce delay
     }
@@ -162,9 +180,8 @@ void setTime() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Set Time:");
-
-  // Use BUTTON_PIN_ONE and BUTTON_PIN_TWO to adjust hours and minutes.
-  // Implement logic for setting time based on button presses.
+  
+  // Implement logic for setting the RTC time
 }
 
 void setSprayInterval() {
@@ -177,17 +194,16 @@ void setSprayInterval() {
     lcd.print(sprayHour);
     lcd.print(" hours");
 
-    // Use BUTTON_PIN_ONE to increase, BUTTON_PIN_TWO to decrease
-    if (digitalRead(BUTTON_PIN_ONE) == LOW) {
+    if (digitalRead(SWITCH_PIN) == LOW) {
       sprayHour++;
       delay(200);  // Debounce
     }
-    if (digitalRead(BUTTON_PIN_TWO) == LOW) {
+    if (digitalRead(SELECT_PIN) == LOW) {
       sprayHour = max(1, sprayHour - 1);  // Don't allow less than 1 hour
       delay(200);
     }
 
-    if (detectLongPress(BUTTON_PIN_ONE)) {
+    if (detectLongPress(MENU_PIN)) {
       return;  // Exit back to menu on long press
     }
   }
@@ -203,17 +219,165 @@ void setSprayDuration() {
     lcd.print(sprayDuration);
     lcd.print(" minutes");
 
-    // Use BUTTON_PIN_ONE to increase, BUTTON_PIN_TWO to decrease
-    if (digitalRead(BUTTON_PIN_ONE) == LOW) {
+    if (digitalRead(SWITCH_PIN) == LOW) {
       sprayDuration++;
       delay(200);  // Debounce
     }
-    if (digitalRead(BUTTON_PIN_TWO) == LOW) {
+    if (digitalRead(SELECT_PIN) == LOW) {
       sprayDuration = max(1, sprayDuration - 1);  // Minimum 1 minute
       delay(200);
     }
 
-    if (detectLongPress(BUTTON_PIN_ONE)) {
+    if (detectLongPress(MENU_PIN)) {
+      return;  // Exit back to menu on long press
+    }
+  }
+}
+
+void setStartTime() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Set Start Time:");
+
+  while (true) {
+    
+    lcd.setCursor(0, 1);
+    lcd.print(startHour);
+    lcd.print(":");
+    lcd.print(startMinute);
+
+switch (selectedStartTimeIndex)
+{
+case 0:{
+  
+  lcd.setCursor(0, 1);
+  lcd.print(startHour);
+  lcd.print(":");
+  lcd.print(startMinute);
+  if (digitalRead(SWITCH_PIN) == LOW) {
+    startHour++;
+    delay(200);  // Debounce
+  }
+  if (digitalRead(SELECT_PIN) == LOW) {
+    startHour = max(0, startHour - 1);  // Don't allow less than 0 hour
+    delay(200);
+  }
+  /* code */
+  break;
+}
+case 1:{
+
+  lcd.setCursor(0, 1);
+  lcd.print(startHour);
+  lcd.print(":");
+  lcd.print(startMinute);
+  if (digitalRead(SWITCH_PIN) == LOW) {
+    startMinute++;
+    delay(200);  // Debounce
+  }
+  if (digitalRead(SELECT_PIN) == LOW) {
+    startMinute = max(0, startMinute - 1);  // Don't allow less than 0 hour
+    delay(200);
+  }
+  /* code */
+  break;
+
+}
+
+
+}
+    // if (digitalRead(SWITCH_PIN) == LOW) {
+    //   startHour++;
+    //   delay(200);  // Debounce
+    // }
+    // if (digitalRead(SELECT_PIN) == LOW) {
+    //   startHour = max(0, startHour - 1);  // Don't allow less than 0 hour
+    //   delay(200);
+    // }
+ 
+    if(digitalRead(MENU_PIN==LOW)){
+      selectedStartTimeIndex=(selectedStartTimeIndex+1)%maxTimeItems;
+    }
+
+    if (detectLongPress(MENU_PIN)) {
+      return;  // Exit back to menu on long press
+    }
+  }
+}
+
+void setEndTime() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Set End Time:");
+
+  while (true) {
+    lcd.setCursor(0, 1);
+    lcd.print(endHour);
+    lcd.print(":");
+    lcd.print(endMinute);
+
+    switch (selectedEndTimeIndex)
+    {
+    case /* constant-expression */0:{
+        
+        lcd.setCursor(0, 1);
+        lcd.print(endHour);
+        lcd.print(":");
+        lcd.print(endMinute);
+        if (digitalRead(SWITCH_PIN) == LOW) {
+          endHour++;
+          delay(200);  // Debounce
+        }
+        if (digitalRead(SELECT_PIN) == LOW) {
+          endHour = max(0, endHour - 1);  // Don't allow less than 0 hour
+          delay(200);
+        }
+        /* code */
+        break;
+    }
+      /* code */
+      case 1:{
+        
+        lcd.setCursor(0, 1);
+        lcd.print(endHour);
+        lcd.print(":");
+        lcd.print(endMinute);
+        if (digitalRead(SWITCH_PIN) == LOW) {
+          endMinute++;
+          delay(200);  // Debounce
+        }
+        if (digitalRead(SELECT_PIN) == LOW) {
+          endMinute = max(0, endMinute - 1);  // Don't allow less than 0 hour
+          delay(200);
+        }
+        /* code */
+        break;
+      }
+   
+    }
+
+    // if (digitalRead(MENU_PIN) == LOW) {
+    //   endHour++;
+    //   delay(200);  // Debounce
+    // }
+    // if (digitalRead(SELECT_PIN) == LOW) {
+    //   endHour = max(0, endHour - 1);  // Don't allow less than 0 hour
+    //   delay(200);
+    // }
+
+if (digitalRead(MENU_PIN==LOW)){    
+  selectedEndTimeIndex=(selectedEndTimeIndex+1)%maxTimeItems;
+}
+    // if (digitalRead(SWITCH_PIN) == LOW) {
+    //   endMinute++;
+    //   delay(200);  // Debounce
+    // }
+    // if (digitalRead(SELECT_PIN) == LOW) {
+    //   endMinute = max(0, endMinute - 1);  // Don't allow less than 0 minute
+    //   delay(200);
+    //
+
+    if (detectLongPress(MENU_PIN)) {
       return;  // Exit back to menu on long press
     }
   }
@@ -225,7 +389,7 @@ bool detectLongPress(int buttonPin) {
     if (buttonOnePressTime == 0) {
       buttonOnePressTime = millis();
     }
-    if ((millis() - buttonOnePressTime) >= longPressDuration) {
+    if ((millis() - buttonOnePressTime) > longPressDuration) {
       buttonOnePressTime = 0;
       return true;
     }
