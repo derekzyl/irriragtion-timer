@@ -29,9 +29,15 @@ MenuState currentMenu = MAIN;
 
 enum  HourOrMinute { HOUR, MINUTE };
 HourOrMinute currentSetting = HOUR;
+
+enum IncreaseOrDecrease { INCREASE, DECREASE };
+IncreaseOrDecrease currentAction = INCREASE;
+
+enum TimeSetting { START, END };
+TimeSetting currentTimeSetting = START;
 unsigned long buttonOnePressTime = 0;
 bool buttonOneLongPressDetected = false;
-const unsigned long longPressDuration = 3000; // 2 seconds for long press detection
+const unsigned long longPressDuration = 2000; // 2 seconds for long press detection
 
 int selectedMenuIndex = 0;
 int selectedStartTimeIndex = 0;
@@ -52,6 +58,7 @@ void setSprayDuration();
 void setTime();
 void setStartTime();
 void setEndTime();
+void setHourOrMinute(HourOrMinute setting, TimeSetting time, IncreaseOrDecrease action);
 
 void setup() {
   Serial.begin(9600);
@@ -126,12 +133,18 @@ void checkIrrigation() {
 void triggerIrrigation() {
   digitalWrite(ALARM_PIN, HIGH);
   digitalWrite(IRRIGATION_PIN, HIGH);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Irrigation ON");
   Serial.println("Irrigation ON");
   delay(1000);  // Delay to ensure the relay is triggered
   digitalWrite(ALARM_PIN, LOW);
   delay(sprayDuration * 60 * 1000);  // sprayDuration in minutes
 
   digitalWrite(IRRIGATION_PIN, LOW);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Irrigation OFF");
   Serial.println("Irrigation OFF");
 }
 
@@ -255,11 +268,12 @@ case 0:{
   lcd.print(":");
   lcd.print(startMinute);
   if (digitalRead(SWITCH_PIN) == LOW) {
-    startHour++;
+    
+    setHourOrMinute(HOUR, START, INCREASE);
     delay(200);  // Debounce
   }
   if (digitalRead(SELECT_PIN) == LOW) {
-    startHour = max(0, startHour - 1);  // Don't allow less than 0 hour
+    setHourOrMinute(HOUR, START, DECREASE);
     delay(200);
   }
   /* code */
@@ -272,11 +286,12 @@ case 1:{
   lcd.print(":");
   lcd.print(startMinute);
   if (digitalRead(SWITCH_PIN) == LOW) {
-    startMinute++;
+    setHourOrMinute(MINUTE, START, INCREASE);
+    
     delay(200);  // Debounce
   }
   if (digitalRead(SELECT_PIN) == LOW) {
-    startMinute = max(0, startMinute - 1);  // Don't allow less than 0 hour
+    setHourOrMinute(MINUTE, START, DECREASE);
     delay(200);
   }
   /* code */
@@ -295,7 +310,7 @@ case 1:{
     //   delay(200);
     // }
  
-    if(digitalRead(MENU_PIN==LOW)){
+    if(digitalRead(MENU_PIN)==LOW){
       selectedStartTimeIndex=(selectedStartTimeIndex+1)%maxTimeItems;
     }
 
@@ -325,11 +340,12 @@ void setEndTime() {
         lcd.print(":");
         lcd.print(endMinute);
         if (digitalRead(SWITCH_PIN) == LOW) {
-          endHour++;
+
+      setHourOrMinute(HOUR,END, INCREASE);
           delay(200);  // Debounce
         }
         if (digitalRead(SELECT_PIN) == LOW) {
-          endHour = max(0, endHour - 1);  // Don't allow less than 0 hour
+          setHourOrMinute(HOUR, END, DECREASE);
           delay(200);
         }
         /* code */
@@ -343,11 +359,11 @@ void setEndTime() {
         lcd.print(":");
         lcd.print(endMinute);
         if (digitalRead(SWITCH_PIN) == LOW) {
-          endMinute++;
+          setHourOrMinute(MINUTE, END, INCREASE);
           delay(200);  // Debounce
         }
         if (digitalRead(SELECT_PIN) == LOW) {
-          endMinute = max(0, endMinute - 1);  // Don't allow less than 0 hour
+          setHourOrMinute(MINUTE, END, DECREASE);
           delay(200);
         }
         /* code */
@@ -365,7 +381,7 @@ void setEndTime() {
     //   delay(200);
     // }
 
-if (digitalRead(MENU_PIN==LOW)){    
+if (digitalRead(MENU_PIN)==LOW){    
   selectedEndTimeIndex=(selectedEndTimeIndex+1)%maxTimeItems;
 }
     // if (digitalRead(SWITCH_PIN) == LOW) {
@@ -397,4 +413,74 @@ bool detectLongPress(int buttonPin) {
     buttonOnePressTime = 0;
   }
   return false;
+}
+
+
+void setHourOrMinute(HourOrMinute setting, TimeSetting timeSetting, IncreaseOrDecrease action)
+
+
+
+ {
+  if (setting == HOUR) {
+    if (action == INCREASE) {
+      if (timeSetting == START) {
+        startHour++;
+        if (startHour > 23) {
+          startHour = 0;
+        }
+      } else {
+        endHour++;
+        if (endHour > 23) {
+          endHour = 0;
+        }
+      }
+
+      
+      
+  } else {
+   if(timeSetting==START){
+    startHour--;
+    if(startHour<0){
+   
+      startHour=23;}
+      // value = value % 60;  // 60 minutes in an hour
+    } else {
+      endHour--;
+      if(endHour<0){
+        endHour=23;
+      }
+     
+    }
+  }
+}else{
+  if (action == INCREASE) {
+    if (timeSetting == START) {
+      startMinute++;
+      if (startMinute > 59) {
+        startMinute = 0;
+        setHourOrMinute(HOUR, START, INCREASE);
+      }
+    } else {
+      endMinute++;
+      if (endMinute > 59) {
+        endMinute = 0;
+        setHourOrMinute(HOUR, END, INCREASE);
+      }
+    }
+  } else {
+    if (timeSetting == START) {
+      startMinute--;
+      if (startMinute < 0) {
+        startMinute = 59;
+        setHourOrMinute(HOUR, START, DECREASE);
+      }
+    } else {
+      endMinute--;
+      if (endMinute < 0) {
+        endMinute = 59;
+        setHourOrMinute(HOUR, END, DECREASE);
+      }
+    }
+  }
+}
 }
