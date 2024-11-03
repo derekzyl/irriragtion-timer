@@ -212,6 +212,10 @@ void displayTimeAndSettings() {
  
 }
 
+/**
+ * The function `checkIrrigation` determines whether it is within a specified time window and at a
+ * spray interval to trigger irrigation accordingly.
+ */
 void checkIrrigation() {
   currentTime = rtc.now();
   int currentHour = currentTime.hour();
@@ -264,6 +268,10 @@ void checkIrrigation() {
 
 
 
+/**
+ * The function `triggerIrrigation` controls the irrigation system based on specified parameters and
+ * displays the status on an LCD screen.
+ */
 void triggerIrrigation() {
   // Only proceed if we're still within the time window when starting
   currentTime = rtc.now();
@@ -346,6 +354,10 @@ void handleMenu() {
   }
 }
 
+/**
+ * The function `setTime()` is used to enter time set mode and implement logic for setting the RTC
+ * time.
+ */
 void setTime() {
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -356,6 +368,13 @@ void setTime() {
 }
 
 
+/**
+ * The function `setSprayInterval` allows the user to set the spray interval in hours and minutes using
+ * buttons and displays the current interval on an LCD screen.
+ * 
+ * @return The function `setSprayInterval()` will return to the menu when a long press is detected on
+ * the MENU_PIN.
+ */
 void setSprayInterval() {
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -397,6 +416,13 @@ void setSprayInterval() {
 }
 
 
+/**
+ * The function `setSprayDuration` allows the user to set the spray duration in minutes using buttons
+ * and displays the current duration on an LCD screen.
+ * 
+ * @return The function `setSprayDuration()` returns to the menu when a long press is detected on the
+ * MENU_PIN.
+ */
 void setSprayDuration() {
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -425,6 +451,14 @@ void setSprayDuration() {
 
 }
 
+/**
+ * The function `setStartTime` in C++ displays and allows the user to set the start time, with options
+ * to adjust the hour and minute using buttons and save the settings.
+ * 
+ * @return In the provided code snippet, the `return;` statement is being used to exit the
+ * `setStartTime()` function and return back to the main menu when a long press is detected on the
+ * `MENU_PIN`. This action is triggered by the `detectLongPress(MENU_PIN)` function.
+ */
 void setStartTime() {
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -509,6 +543,14 @@ case 1:{
   }
 }
 
+/**
+ * The function `setEndTime` in C++ displays and allows the user to set the end time, with options to
+ * adjust the hour and minute values using buttons, and save settings to EEPROM on long press.
+ * 
+ * @return In the provided code snippet, the `return;` statement is being used to exit the
+ * `setEndTime()` function and return back to the main menu when a long press is detected on the
+ * `MENU_PIN`.
+ */
 void setEndTime() {
   lcd.clear();
   lcd.setCursor(0, 0);
