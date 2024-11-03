@@ -2,7 +2,7 @@
 #include <Wire.h>
 #include <RTClib.h>
 #include <LiquidCrystal_I2C.h>
-
+#include <EEPROM.h>
 // Define pins
 int ALARM_PIN = 13;
 int MENU_PIN = 8;  // Button for menu navigation and selection
@@ -10,6 +10,13 @@ int SELECT_PIN = 6;  // Button for decreasing values
 int IRRIGATION_PIN = 12;
 int SWITCH_PIN=5;
 
+// EEPROM addresses for storing settings
+const int ADDR_SPRAY_MINUTES = 0;
+const int ADDR_SPRAY_DURATION = 4;
+const int ADDR_START_HOUR = 8;
+const int ADDR_START_MINUTE = 12;
+const int ADDR_END_HOUR = 16;
+const int ADDR_END_MINUTE = 20;
 // Define LCD and RTC objects
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 RTC_DS3231 rtc;
@@ -21,7 +28,7 @@ int startHour = 6;      // Start time for irrigation (6 AM)
 int startMinute = 0;    // Start time minute
 int endHour = 18;       // End time for irrigation (6 PM)
 int endMinute = 0;      // End time minute
-
+unsigned long nextSprayTime = 0;  // Store next spray time in minutes since midnight
 DateTime currentTime;
 
 enum MenuState { MAIN, SET_TIME, SET_INTERVAL, SET_DURATION, SET_START_TIME, SET_END_TIME, EXIT_MENU };
@@ -43,7 +50,7 @@ int selectedMenuIndex = 0;
 int selectedStartTimeIndex = 0;
 int selectedEndTimeIndex = 0;
 
-const int maxMenuItems = 6;  // Updated number of menu items
+const int maxMenuItems = 5;  // Updated number of menu items
 const int maxTimeItems = 2;  // Updated number of time items
 
 // Prototypes
@@ -59,7 +66,56 @@ void setTime();
 void setStartTime();
 void setEndTime();
 void setHourOrMinute(HourOrMinute setting, TimeSetting time, IncreaseOrDecrease action);
+void saveSettingsToEEPROM() {
+  EEPROM.put(ADDR_SPRAY_MINUTES, sprayMinutes);
+  EEPROM.put(ADDR_SPRAY_DURATION, sprayDuration);
+  EEPROM.put(ADDR_START_HOUR, startHour);
+  EEPROM.put(ADDR_START_MINUTE, startMinute);
+  EEPROM.put(ADDR_END_HOUR, endHour);
+  EEPROM.put(ADDR_END_MINUTE, endMinute);
+}
 
+void loadSettingsFromEEPROM() {
+  EEPROM.get(ADDR_SPRAY_MINUTES, sprayMinutes);
+  EEPROM.get(ADDR_SPRAY_DURATION, sprayDuration);
+  EEPROM.get(ADDR_START_HOUR, startHour);
+  EEPROM.get(ADDR_START_MINUTE, startMinute);
+  EEPROM.get(ADDR_END_HOUR, endHour);
+  EEPROM.get(ADDR_END_MINUTE, endMinute);
+  
+  // Validate loaded values
+  if (sprayMinutes < 30 || sprayMinutes > 1440) sprayMinutes = 360;
+  if (sprayDuration < 1 || sprayDuration > 120) sprayDuration = 30;
+  if (startHour < 0 || startHour > 23) startHour = 6;
+  if (startMinute < 0 || startMinute > 59) startMinute = 0;
+  if (endHour < 0 || endHour > 23) endHour = 18;
+  if (endMinute < 0 || endMinute > 59) endMinute = 0;
+}
+
+// Calculate next spray time based on current time
+void calculateNextSprayTime() {
+  currentTime = rtc.now();
+  int currentTimeInMinutes = currentTime.hour() * 60 + currentTime.minute();
+  int startTimeInMinutes = startHour * 60 + startMinute;
+  
+  // Calculate how many intervals have passed since start time
+  int minutesSinceStart;
+  if (currentTimeInMinutes >= startTimeInMinutes) {
+    minutesSinceStart = currentTimeInMinutes - startTimeInMinutes;
+  } else {
+    minutesSinceStart = (24 * 60 + currentTimeInMinutes) - startTimeInMinutes;
+  }
+  
+  // Calculate intervals passed and next interval
+  int intervalsPassed = minutesSinceStart / sprayMinutes;
+  int nextInterval = (intervalsPassed + 1) * sprayMinutes;
+  
+  // Calculate next spray time
+  nextSprayTime = startTimeInMinutes + nextInterval;
+  if (nextSprayTime >= 24 * 60) {
+    nextSprayTime -= 24 * 60;
+  }
+}
 void setup() {
   Serial.begin(9600);
 
@@ -71,11 +127,16 @@ void setup() {
     Serial.println("Couldn't find RTC");
     while (1);
   }
-
+ loadSettingsFromEEPROM();
   if (rtc.lostPower()) {
     Serial.println("RTC lost power, setting the time!");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__))); // Set RTC to compile time if power was lost
   }
+
+  //  RTCTime startTime(02, Month::NOVEMBER, 2024, 14, 27, 00, DayOfWeek::SUNDAY, SaveLight::SAVING_TIME_ACTIVE);
+
+  // RTC.setTime(startTime);
+  //  rtc.adjust(DateTime(2024, 11, 03, 14, 34, 20));
 
   // Initialize pins
   pinMode(ALARM_PIN, OUTPUT);
@@ -86,6 +147,9 @@ void setup() {
 
   // Display default info on LCD
   displayTimeAndSettings();
+
+    // Calculate initial next spray time
+  calculateNextSprayTime();
 }
 
 void loop() {
@@ -255,23 +319,22 @@ void handleMenu() {
     lcd.setCursor(0, 0);
 
     switch (selectedMenuIndex) {
-      case 0: lcd.print("> Set Time"); break;
-      case 1: lcd.print("> Set Interval"); break;
-      case 2: lcd.print("> Set Duration"); break;
-      case 3: lcd.print("> Set Start Time"); break;  // Added start time menu option
-      case 4: lcd.print("> Set End Time"); break;    // Added end time menu option
-      case 5: lcd.print("> Exit"); break;
+      case 0: lcd.print("> Set Interval"); break;
+      case 1: lcd.print("> Set Duration"); break;
+      case 2: lcd.print("> Set Start Time"); break;  // Added start time menu option
+      case 3: lcd.print("> Set End Time"); break;    // Added end time menu option
+      case 4: lcd.print("> Exit"); break;
     }
 
     if (detectLongPress(SELECT_PIN)) {
       // Long press selects the current menu item
       switch (selectedMenuIndex) {
-        case 0: setTime(); break;
-        case 1: setSprayInterval(); break;
-        case 2: setSprayDuration(); break;
-        case 3: setStartTime(); break;  // Added start time logic
-        case 4: setEndTime(); break;    // Added end time logic
-        case 5: currentMenu = MAIN; return;
+    
+        case 0: setSprayInterval(); break;
+        case 1: setSprayDuration(); break;
+        case 2: setStartTime(); break;  // Added start time logic
+        case 3: setEndTime(); break;    // Added end time logic
+        case 4: currentMenu = MAIN; return;
       }
     }
 
@@ -325,6 +388,9 @@ void setSprayInterval() {
     }
 
     if (detectLongPress(MENU_PIN)) {
+        saveSettingsToEEPROM();
+  calculateNextSprayTime();
+
       return;  // Exit back to menu on long press
     }
   }
@@ -351,9 +417,12 @@ void setSprayDuration() {
     }
 
     if (detectLongPress(MENU_PIN)) {
+        saveSettingsToEEPROM();
+  // calculateNextSprayTime();
       return;  // Exit back to menu on long press
     }
   }
+
 }
 
 void setStartTime() {
@@ -378,9 +447,9 @@ case 0:{
   lcd.setCursor(0, 1);
   lcd.print(startHour);
   lcd.print(":");
-  if(startMinute<10){
-    lcd.print("0");
-  }
+  // if(startMinute<10){
+  //   lcd.print("0");
+  // }
   lcd.print(startMinute);
   if (digitalRead(SWITCH_PIN) == LOW) {
     
@@ -433,6 +502,8 @@ case 1:{
     }
 
     if (detectLongPress(MENU_PIN)) {
+        saveSettingsToEEPROM();
+  calculateNextSprayTime();
       return;  // Exit back to menu on long press
     }
   }
@@ -447,9 +518,9 @@ void setEndTime() {
     lcd.setCursor(0, 1);
     lcd.print(endHour);
     lcd.print(":");
-    if(endMinute<10){
-      lcd.print("0");
-    }
+    // if(endMinute<10){
+    //   lcd.print("0");
+    // }
     lcd.print(endMinute);
 
     switch (selectedEndTimeIndex)
@@ -518,6 +589,8 @@ if (digitalRead(MENU_PIN)==LOW){
     //
 
     if (detectLongPress(MENU_PIN)) {
+        saveSettingsToEEPROM();
+  // calculateNextSprayTime();
       return;  // Exit back to menu on long press
     }
   }

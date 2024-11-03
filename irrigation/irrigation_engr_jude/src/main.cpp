@@ -4,11 +4,11 @@
 #include <LiquidCrystal_I2C.h>
 
 // Define pins
-int ALARM_PIN = 13;
-int MENU_PIN = 8;  // Button for menu navigation and selection
-int SELECT_PIN = 6;  // Button for decreasing values
-int IRRIGATION_PIN = 12;
-int SWITCH_PIN=5;
+int ALARM_PIN = 2;
+int MENU_PIN = 12;  // Button for menu navigation and selection
+int SELECT_PIN = 11;  // Button for decreasing values
+int IRRIGATION_PIN = 13;
+int SWITCH_PIN=10;
 
 // Define LCD and RTC objects
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -43,7 +43,7 @@ int selectedMenuIndex = 0;
 int selectedStartTimeIndex = 0;
 int selectedEndTimeIndex = 0;
 
-const int maxMenuItems = 6;  // Updated number of menu items
+const int maxMenuItems = 5;  // Updated number of menu items
 const int maxTimeItems = 2;  // Updated number of time items
 
 // Prototypes
@@ -55,7 +55,7 @@ void handleMenu();
 bool detectLongPress(int buttonPin);
 void setSprayInterval();
 void setSprayDuration();
-void setTime();
+// void setTime();
 void setStartTime();
 void setEndTime();
 void setHourOrMinute(HourOrMinute setting, TimeSetting time, IncreaseOrDecrease action);
@@ -255,7 +255,7 @@ void handleMenu() {
     lcd.setCursor(0, 0);
 
     switch (selectedMenuIndex) {
-      case 0: lcd.print("> Set Time"); break;
+    
       case 1: lcd.print("> Set Interval"); break;
       case 2: lcd.print("> Set Duration"); break;
       case 3: lcd.print("> Set Start Time"); break;  // Added start time menu option
@@ -266,12 +266,12 @@ void handleMenu() {
     if (detectLongPress(SELECT_PIN)) {
       // Long press selects the current menu item
       switch (selectedMenuIndex) {
-        case 0: setTime(); break;
-        case 1: setSprayInterval(); break;
-        case 2: setSprayDuration(); break;
-        case 3: setStartTime(); break;  // Added start time logic
-        case 4: setEndTime(); break;    // Added end time logic
-        case 5: currentMenu = MAIN; return;
+        // case 0: setTime(); break;
+        case 0: setSprayInterval(); break;
+        case 1: setSprayDuration(); break;
+        case 2: setStartTime(); break;  // Added start time logic
+        case 3: setEndTime(); break;    // Added end time logic
+        case 4: currentMenu = MAIN; return;
       }
     }
 
@@ -283,14 +283,7 @@ void handleMenu() {
   }
 }
 
-void setTime() {
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Time set mode");
-  
-  
-  // Implement logic for setting the RTC time
-}
+
 
 
 void setSprayInterval() {
