@@ -1,0 +1,62 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
+{
+    "configurations": [
+        {
+            "name": "PlatformIO",
+            "includePath": [
+                "/home/favour/Desktop/embedded/irriragtion-timer/include",
+                "/home/favour/Desktop/embedded/irriragtion-timer/src",
+                "/home/favour/Desktop/embedded/irriragtion-timer/.pio/libdeps/nanoatmega328/RTClib/src",
+                "/home/favour/Desktop/embedded/irriragtion-timer/.pio/libdeps/nanoatmega328/Adafruit BusIO",
+                "/home/favour/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
+                "/home/favour/Desktop/embedded/irriragtion-timer/.pio/libdeps/nanoatmega328/LiquidCrystal_I2C",
+                "/home/favour/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
+                "/home/favour/.platformio/packages/framework-arduino-avr/cores/arduino",
+                "/home/favour/.platformio/packages/framework-arduino-avr/variants/eightanaloginputs",
+                "/home/favour/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
+                "/home/favour/.platformio/packages/framework-arduino-avr/libraries/HID/src",
+                "/home/favour/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
+                ""
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "/home/favour/Desktop/embedded/irriragtion-timer/include",
+                    "/home/favour/Desktop/embedded/irriragtion-timer/src",
+                    "/home/favour/Desktop/embedded/irriragtion-timer/.pio/libdeps/nanoatmega328/RTClib/src",
+                    "/home/favour/Desktop/embedded/irriragtion-timer/.pio/libdeps/nanoatmega328/Adafruit BusIO",
+                    "/home/favour/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
+                    "/home/favour/Desktop/embedded/irriragtion-timer/.pio/libdeps/nanoatmega328/LiquidCrystal_I2C",
+                    "/home/favour/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
+                    "/home/favour/.platformio/packages/framework-arduino-avr/cores/arduino",
+                    "/home/favour/.platformio/packages/framework-arduino-avr/variants/eightanaloginputs",
+                    "/home/favour/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
+                    "/home/favour/.platformio/packages/framework-arduino-avr/libraries/HID/src",
+                    "/home/favour/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
+                    ""
+                ]
+            },
+            "defines": [
+                "PLATFORMIO=60116",
+                "ARDUINO_AVR_NANO",
+                "F_CPU=16000000L",
+                "ARDUINO_ARCH_AVR",
+                "ARDUINO=10808",
+                "__AVR_ATmega328P__",
+                ""
+            ],
+            "cStandard": "gnu11",
+            "cppStandard": "gnu++11",
+            "compilerPath": "/home/favour/.platformio/packages/toolchain-atmelavr/bin/avr-gcc",
+            "compilerArgs": [
+                "-mmcu=atmega328p",
+                ""
+            ]
+        }
+    ],
+    "version": 4
+}
