@@ -256,11 +256,11 @@ void handleMenu() {
 
     switch (selectedMenuIndex) {
     
-      case 1: lcd.print("> Set Interval"); break;
-      case 2: lcd.print("> Set Duration"); break;
-      case 3: lcd.print("> Set Start Time"); break;  // Added start time menu option
-      case 4: lcd.print("> Set End Time"); break;    // Added end time menu option
-      case 5: lcd.print("> Exit"); break;
+      case 0: lcd.print("> Set Interval"); break;
+      case 1: lcd.print("> Set Duration"); break;
+      case 2: lcd.print("> Set Start Time"); break;  // Added start time menu option
+      case 3: lcd.print("> Set End Time"); break;    // Added end time menu option
+      case 4: lcd.print("> Exit"); break;
     }
 
     if (detectLongPress(SELECT_PIN)) {
